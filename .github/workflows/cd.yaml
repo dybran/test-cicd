@@ -38,7 +38,8 @@ jobs:
       DUPLO_HOST: https://hrhouz.duplocloud.net
       DUPLO_TENANT: dev01
     steps:  
-    # uses duploctl from above
+    - name: Duplo Setup
+      uses: duplocloud/actions/setup@v0.0.3
     - name: Update Service
       uses: duplocloud/actions/update-service@v0.0.3
       with:

@@ -1,0 +1,61 @@
+name: Infrastructure AMI Build
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Select the environment for AMI build'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - stage
+          - prod
+jobs:
+  ami:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+      - name: Set up Packer
+        uses: hashicorp/setup-packer@v2
+  
+
+      - name: Determine Branch
+        run: |
+          echo "Running workflow on branch: ${{ github.ref_name }}"
+
+      - name: Set Environment
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "prod" ]; then
+            echo "choosing prod"
+            echo "AWS_ACCESS_KEY_ID=${{ secrets.PROD_AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+            echo "AWS_SECRET_ACCESS_KEY=${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+            echo "AWS_REGION=${{ vars.PROD_AWS_REGION }}" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.environment }}" == "stage" ]; then
+            echo "AWS_ACCESS_KEY_ID=${{ secrets.STAGE_AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+            echo "AWS_SECRET_ACCESS_KEY=${{ secrets.STAGE_AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+            echo "AWS_REGION=${{ vars.STAGE_AWS_REGION }}" >> $GITHUB_ENV
+            echo "choosing stage"
+          else
+            echo "AWS_ACCESS_KEY_ID=${{ secrets.DEV_AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+            echo "AWS_SECRET_ACCESS_KEY=${{ secrets.DEV_AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+            echo "AWS_REGION=${{ vars.DEV_AWS_REGION }}" >> $GITHUB_ENV
+            echo "choosing dev"
+          fi
+      - name: Set AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+      - name: Initialize Packer
+        working-directory: "infrastructure/ami"
+        run: packer init .
+      - name: Build AMI
+        working-directory: "infrastructure/ami"
+        run: |
+          packer build \
+            -var "aws_access_key_id=${{ env.AWS_ACCESS_KEY_ID }}" \
+            -var "aws_secret_key=${{ env.AWS_SECRET_ACCESS_KEY }}" \
+            -var "region=${{ env.AWS_REGION }}" .
